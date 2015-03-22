@@ -26,12 +26,18 @@ public:
 
 public:
     natural() : digits(0) {}
-    explicit natural(digit_t n) : digits(1,n) {}
+    explicit natural(digit_t n) { if (n != 0) digits.push_back(n); }
     explicit natural(std::string const & s) {
         auto t = natural::from_string(s);
         *this = t ? *t : natural(0);
     }
+#ifdef NDEBUG
     ~natural() = default; // non virtual
+#else
+    ~natural() {
+        assert (digits.empty() or digits.back() != 0);
+    }
+#endif
 private:
     explicit natural(digits_t const & _digits)
         : digits(_digits) {
