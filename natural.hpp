@@ -46,6 +46,7 @@ private:
 public:
     static natural increment(natural const & a);
     static natural decrement(natural const & a);
+    natural & operator += (natural const & n);
     friend natural operator + (natural const & a, natural const & b);
     friend natural operator - (natural const & a, natural const & b);
     friend natural operator * (natural const & a, natural const & b);
@@ -94,23 +95,31 @@ natural natural::decrement(natural const & n) {
     return natural(a);
 }
 
-// O(max(length m, length n))
-natural operator + (natural const & m, natural const & n) {
-    natural::digits_t const & a = m.digits;
-    natural::digits_t const & b = n.digits;
-    natural::digits_t c(std::max(a.size(), b.size()) + 1);
+natural & natural::operator += (natural const & bn) {
+    natural::digits_t & a = digits;
+    natural::digits_t const & b = bn.digits;
+    a.resize(std::max(a.size(), b.size()) + 1);
     bool overflow = false;
-    for (int i = 0; i < c.size(); ++i) {
-        natural::double_digit_t t = 0;
-        if (i < a.size()) t += a[i];
-        if (i < b.size()) t += b[i];
-        if (overflow) t += 1;
-        c[i] = t; // overflow of unsigned natural is defined
-        overflow = natural::digit_max < t;
+    for (int i = 0; i < b.size(); ++i) {
+        natural::double_digit_t t = (natural::double_digit_t) a[i] + b[i] + (overflow ? 1 : 0);
+        a[i] = t;
         assert (natural::high_digit(t) <= 1);
+        overflow = natural::high_digit(t);
     }
-    assert (not overflow);
-    return natural(c);
+    if (overflow) {
+        for (int i = b.size(); i < a.size(); ++i) {
+            a[i] += 1;
+            if (a[i] != 0) break;
+        }
+    }
+    normalize();
+    return *this;
+}
+
+natural operator + (natural const & a, natural const & b) {
+    natural c = a;
+    c += b;
+    return c;
 }
 
 natural operator - (natural const & m, natural const & n) {
@@ -195,7 +204,7 @@ std::pair<natural,natural> natural::divmod(natural const & _an, natural const & 
             while (natural(a) < bn * x * y) {
                 x = decrement(x);
             }
-            q = q + x * y;
+            q += x * y;
             a = (natural(a) - bn * x * y).digits;
         } else {
             assert (a.back() != 0);
@@ -209,7 +218,7 @@ std::pair<natural,natural> natural::divmod(natural const & _an, natural const & 
             while (natural(a) < bn * x) {
                 x = decrement(x);
             }
-            q = q + x;
+            q += x;
             a = (natural(a) - bn * x).digits;
         }
     }
@@ -272,7 +281,8 @@ std::experimental::optional<natural> natural::from_string(std::string const & s)
     natural a = natural(0);
     for (int i = 0; i < s.length(); ++i) {
         if (not isdigit(s[i])) return std::experimental::optional<natural>();
-        a = a * natural(10) + natural(s[i]-'0');
+        a = a * natural(10);
+        a += natural(s[i]-'0');
     }
     return std::experimental::optional<natural>(a);
 }
