@@ -68,6 +68,8 @@ public:
     friend std::istream & operator >> (std::istream & input, natural & n);
     friend std::ostream & operator << (std::ostream & output, natural const & n);
 private:
+    natural & operator *= (digit_t n); // for implementation
+    friend natural operator * (natural const & a, digit_t b);
     bool valid() const {
         return digits.empty() or digits.back() != 0;
     }
@@ -77,6 +79,10 @@ private:
     }
     static natural rshift_digit(natural const & a, int b);
     static natural lshift_digit(natural const & a, int b);
+    void rshift_digit(int n);
+    void lshift_digit(int n);
+    static std::pair<natural,natural> split_at(natural const & n, int p); // { upper, lower }
+    natural drop(int n); // drop lower n digits and update the remaining upper digits
 private:
     digits_t digits;
 };
@@ -174,51 +180,93 @@ natural operator - (natural const & a, natural const & b) {
     return c;
 }
 
-// O(length m * length n)
-natural operator * (natural const & m, natural const & n) {
-    natural::digits_t const & a = m.digits;
-    natural::digits_t const & b = n.digits;
-    natural::digits_t c(a.size() + b.size());
+natural & natural::operator *= (digit_t b) {
+    natural::digits_t & a = digits;
+    natural::digit_t overflow = 0;
     for (int i = 0; i < a.size(); ++i) {
-        natural::digit_t overflow = 0;
-        for (int j = 0; j < b.size(); ++j) {
-            natural::double_digit_t t = 0; // t itself does not overflow
-            t += c[i+j];
-            t += (natural::double_digit_t) a[i] * b[j];
-            t += overflow;
-            c[i+j] = t;
-            overflow = natural::high_digit(t);
-        }
-        assert (natural::high_digit((natural::double_digit_t) c[i+b.size()] + overflow) == 0); // does not overflow
-        c[i+b.size()] += overflow;
+        natural::double_digit_t t = (natural::double_digit_t) a[i] * b + overflow;
+        assert ((natural::double_digit_t) a[i] * b <= t); // t itself does not overflow
+        a[i] = t;
+        overflow = natural::high_digit(t);
     }
-    return natural(c);
+    if (overflow) {
+        a.resize(a.size() + 1);
+        a.back() = overflow;
+    }
+    assert (valid());
+    return *this;
+}
+natural operator * (natural const & a, natural::digit_t b) {
+    natural c = a;
+    c *= b;
+    return c;
+}
+std::pair<natural,natural> natural::split_at(natural const & n, int p) {
+    natural a = n;
+    natural b = a.drop(p);
+    assert (natural::lshift_digit(a, p) + b == n);
+    return std::make_pair(a, b);
+}
+natural natural::drop(int n) {
+    natural::digits_t & a = digits;
+    if (a.size() <= n) { natural::digits_t b; a.swap(b); return natural(b); }
+    if (n == 0) { return natural(0); }
+    assert (0 <= n and n <= a.size());
+    natural::digits_t b(n);
+    copy(a.begin(), a.begin()+n, b.begin());
+    copy(a.begin()+n, a.end(),   a.begin());
+    a.resize(a.size() - n);
+    return natural(b);
+}
+
+natural operator * (natural const & a, natural const & b) {
+    if (a.digits.empty() or b.digits.empty()) return natural(0);
+    if (b.digits.size() == 1) return a * b.digits[0];
+    if (a.digits.size() == 1) return b * a.digits[0];
+    int p = std::max(a.digits.size(), b.digits.size()) / 2;
+    assert (p != 0);
+    natural a1 = a; natural a0 = a1.drop(p);
+    natural b1 = b; natural b0 = b1.drop(p);
+    // Karatsuba's algorithm
+    const natural c2 = a1 * b1;
+    const natural c0 = a0 * b0;
+    const natural c1 = (a1 + a0) * (b1 + b0) - c2 - c0;
+    return natural::lshift_digit(c2, 2*p) + natural::lshift_digit(c1, p) + c0;
 }
 
 // shift by sizeof(digit_t)
-natural natural::rshift_digit(natural const & n, int b) {
-    natural::digits_t const & a = n.digits;
-    natural::digits_t c;
-    if (0 < b) {
-        c.resize(a.size() - b);
-        for (int i = 0; i < c.size(); ++i) {
-            assert (i+b < a.size());
-            c[i] = a[i+b];
-        }
-    } else if (b < 0) {
-        b = abs(b);
-        c.resize(a.size() + b);
-        for (int i = 0; i < a.size(); ++i) {
-            assert (i+b < c.size());
-            c[i+b] = a[i];
-        }
-    } else {
-        c = a;
-    }
-    return natural(c);
+natural natural::rshift_digit(natural const & a, int b) {
+    natural c = a;
+    c.rshift_digit(b);
+    return c;
 }
 natural natural::lshift_digit(natural const & a, int b) {
-    return rshift_digit(a, -b);
+    natural c = a;
+    c.lshift_digit(b);
+    return c;
+}
+
+void natural::rshift_digit(int b) {
+    if (0 < b) {
+        natural::digits_t & a = digits;
+        assert (b <= a.size());
+        copy(a.begin()+b, a.end(), a.begin());
+        a.resize(a.size() - b);
+        assert (valid());
+    } else if (b < 0) {
+        lshift_digit(- b);
+    }
+}
+void natural::lshift_digit(int b) {
+    if (0 < b) {
+        natural::digits_t & a = digits;
+        if (a.empty()) return;
+        a.resize(a.size() + b);
+        rotate(a.begin(), a.end()-b, a.end());
+        assert (valid());
+    } else if (b < 0) {
+        rshift_digit(- b);
+    }
 }
 
 std::pair<natural,natural> natural::divmod(natural const & _an, natural const & bn) {
@@ -322,7 +370,7 @@ std::experimental::optional<natural> natural::from_string(std::string const & s)
     natural a = natural(0);
     for (int i = 0; i < s.length(); ++i) {
         if (not isdigit(s[i])) return std::experimental::optional<natural>();
-        a *= natural(10);
+        a *= 10;
         a += natural(s[i]-'0');
     }
     return std::experimental::optional<natural>(a);
