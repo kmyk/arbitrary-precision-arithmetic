@@ -34,9 +34,7 @@ public:
 #ifdef NDEBUG
     ~natural() = default; // non virtual
 #else
-    ~natural() {
-        assert (digits.empty() or digits.back() != 0);
-    }
+    ~natural() { assert (valid()); }
 #endif
 private:
     explicit natural(digits_t const & _digits)
@@ -70,9 +68,12 @@ public:
     friend std::istream & operator >> (std::istream & input, natural & n);
     friend std::ostream & operator << (std::ostream & output, natural const & n);
 private:
+    bool valid() const {
+        return digits.empty() or digits.back() != 0;
+    }
     void normalize() {
         while (not digits.empty() and digits.back() == 0) digits.pop_back();
-        assert (digits.empty() or digits.back() > 0);
+        assert (valid());
     }
     static natural rshift_digit(natural const & a, int b);
     static natural lshift_digit(natural const & a, int b);
@@ -90,7 +91,11 @@ natural & natural::operator ++ () {
     return *this;
 }
 natural & natural::operator -- () {
+#ifdef NDEBUG
+    if (digits.empty()) return *this;
+#else
     assert (not digits.empty()); // *this != 0
+#endif
     natural::digits_t & a = digits;
     for (int i = 0; i < a.size(); ++i) {
         a[i] -= 1;
@@ -145,7 +150,11 @@ natural operator + (natural const & a, natural const & b) {
 }
 
 natural operator - (natural const & m, natural const & n) {
+#ifdef NDEBUG
+    if (m <= n) return natural(0);
+#else
     assert (m >= n);
+#endif
     natural::digits_t a = m.digits;
     natural::digits_t const & b = n.digits;
     for (int i = 0; i < b.size(); ++i) {
@@ -258,13 +267,19 @@ natural operator % (natural const & a, natural const & b) {
 }
 
 bool operator == (natural const & a, natural const & b) {
+    assert (a.valid());
+    assert (b.valid());
     return a.digits == b.digits;
 }
 bool operator != (natural const & a, natural const & b) {
+    assert (a.valid());
+    assert (b.valid());
     return a.digits != b.digits;
 }
 
 bool operator <= (natural const & an, natural const & bn) {
+    assert (an.valid());
+    assert (bn.valid());
     natural::digits_t const & a = an.digits;
     natural::digits_t const & b = bn.digits;
     if (a.size() < b.size()) {
