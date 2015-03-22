@@ -136,27 +136,14 @@ natural & natural::operator += (natural const & bn) {
     return *this;
 }
 
-natural & natural::operator -= (natural const & n) {
-    return *this = *this - n;
-}
-natural & natural::operator *= (natural const & n) {
-    return *this = *this * n;
-}
-
-natural operator + (natural const & a, natural const & b) {
-    natural c = a;
-    c += b;
-    return c;
-}
-
-natural operator - (natural const & m, natural const & n) {
+natural & natural::operator -= (natural const & bn) {
 #ifdef NDEBUG
-    if (m <= n) return natural(0);
+    if (*this <= bn) { digits.clear(); return *this; }
 #else
-    assert (m >= n);
+    assert (*this >= bn);
 #endif
-    natural::digits_t a = m.digits;
-    natural::digits_t const & b = n.digits;
+    natural::digits_t & a = digits;
+    natural::digits_t const & b = bn.digits;
     for (int i = 0; i < b.size(); ++i) {
         if (a[i] < b[i]) {
             a[i] = (natural::double_digit_t) natural::digit_max + 1 + a[i] - b[i];
@@ -168,7 +155,23 @@ natural operator - (natural const & m, natural const & n) {
             a[i] -= b[i];
         }
     }
-    return natural(a);
+    normalize();
+    return *this;
+}
+natural & natural::operator *= (natural const & n) {
+    return *this = *this * n;
+}
+
+natural operator + (natural const & a, natural const & b) {
+    natural c = a;
+    c += b;
+    return c;
+}
+
+natural operator - (natural const & a, natural const & b) {
+    natural c = a;
+    c -= b;
+    return c;
 }
 
 // O(length m * length n)
