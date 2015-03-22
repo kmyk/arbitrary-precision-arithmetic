@@ -39,8 +39,9 @@ void test_operate() {
     natural e32m1 = natural("4294967295"); // 2^32 - 1
     natural e32 = natural("4294967296"); // 2^32
     natural e33 = natural("8589934592"); // 2^33
-    assert (natural::increment(e32m1) == e32);
-    assert (e32m1 == natural::decrement(e32));
+    natural a;
+    a = e32m1; assert (++a == e32);
+    a = e32; assert (e32m1 == --a);
     assert (e31 + e31 == e32);
     assert (e32 + e32 == e33);
     assert (e32 - e31 == e31);

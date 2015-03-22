@@ -44,9 +44,13 @@ private:
         normalize();
     }
 public:
-    static natural increment(natural const & a);
-    static natural decrement(natural const & a);
+    natural & operator ++ ();
+    natural & operator -- ();
+    natural   operator ++ (int);
+    natural   operator -- (int);
     natural & operator += (natural const & n);
+    natural & operator -= (natural const & n);
+    natural & operator *= (natural const & n);
     friend natural operator + (natural const & a, natural const & b);
     friend natural operator - (natural const & a, natural const & b);
     friend natural operator * (natural const & a, natural const & b);
@@ -76,23 +80,34 @@ private:
     digits_t digits;
 };
 
-natural natural::increment(natural const & n) {
-    natural::digits_t a = n.digits;
+natural & natural::operator ++ () {
+    natural::digits_t & a = digits;
     for (int i = 0; i < a.size(); ++i) {
         a[i] += 1;
         if (a[i] != 0) break;
     }
-    if (a.back() == 0) a.push_back(1);
-    return natural(a);
+    if (a.empty() or a.back() == 0) a.resize(a.size()+1,1);
+    return *this;
 }
-natural natural::decrement(natural const & n) {
-    assert (n != natural(0));
-    natural::digits_t a = n.digits;
+natural & natural::operator -- () {
+    assert (not digits.empty()); // *this != 0
+    natural::digits_t & a = digits;
     for (int i = 0; i < a.size(); ++i) {
         a[i] -= 1;
         if (a[i] != natural::digit_max) break;
     }
-    return natural(a);
+    normalize();
+    return *this;
+}
+natural natural::operator ++ (int) {
+    natural n = *this;
+    ++ (*this);
+    return n;
+}
+natural natural::operator -- (int) {
+    natural n = *this;
+    -- (*this);
+    return n;
 }
 
 natural & natural::operator += (natural const & bn) {
@@ -114,6 +129,13 @@ natural & natural::operator += (natural const & bn) {
     }
     normalize();
     return *this;
+}
+
+natural & natural::operator -= (natural const & n) {
+    return *this = *this - n;
+}
+natural & natural::operator *= (natural const & n) {
+    return *this = *this * n;
 }
 
 natural operator + (natural const & a, natural const & b) {
@@ -201,11 +223,12 @@ std::pair<natural,natural> natural::divmod(natural const & _an, natural const & 
             natural::double_digit_t t = (natural::to_high_digit(a[i+bl-1]) + a[i+bl-2]) / b[bl-1];
             natural x = natural(natural::digits_t({ natural::low_digit(t), natural::high_digit(t) }));
             natural y = natural::lshift_digit(natural(1), i-1);
-            while (natural(a) < bn * x * y) {
-                x = decrement(x);
+            x *= y;
+            while (natural(a) < bn * x) {
+                x -= y;
             }
-            q += x * y;
-            a = (natural(a) - bn * x * y).digits;
+            q += x;
+            a = (natural(a) - bn * x).digits;
         } else {
             assert (a.back() != 0);
             assert (a.size() == b.size());
@@ -216,7 +239,7 @@ std::pair<natural,natural> natural::divmod(natural const & _an, natural const & 
                 : (natural::to_high_digit(a[l-1]) + a[l-2]) / (natural::to_high_digit(b[l-1]) + b[l-2]) ;
             natural x = natural(t);
             while (natural(a) < bn * x) {
-                x = decrement(x);
+                -- x;
             }
             q += x;
             a = (natural(a) - bn * x).digits;
@@ -281,7 +304,7 @@ std::experimental::optional<natural> natural::from_string(std::string const & s)
     natural a = natural(0);
     for (int i = 0; i < s.length(); ++i) {
         if (not isdigit(s[i])) return std::experimental::optional<natural>();
-        a = a * natural(10);
+        a *= natural(10);
         a += natural(s[i]-'0');
     }
     return std::experimental::optional<natural>(a);
