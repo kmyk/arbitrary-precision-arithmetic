@@ -3,10 +3,10 @@
 cd test
 
 compile () {
-    g++ -std=c++14 -I.. -g -DDEBUG -o $1 $1.cpp
+    g++ -std=c++14 -I.. -g -DDEBUG -o $1 $1.cpp ../natural.cpp ../integer.cpp
 }
 compile-fast () {
-    g++ -std=c++14 -I.. -O2 -DNDEBUG -o $1 $1.cpp
+    g++ -std=c++14 -I.. -O2 -DNDEBUG -o $1 $1.cpp ../natural.cpp ../integer.cpp
 }
 
 compile unit
