@@ -1,4 +1,5 @@
 test/fact
 test/calc
+test/calc-int
 test/unit
 test/popen
